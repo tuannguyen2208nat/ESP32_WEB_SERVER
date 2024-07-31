@@ -1,3 +1,4 @@
+
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
@@ -21,6 +22,9 @@ void setup() {
   if (!LittleFS.begin()) {
     Serial.println("An Error has occurred while mounting LittleFS");
     return;
+  }
+  if (!WiFi.config(local_IP, gateway, subnet)) {
+    Serial.println("STA Failed to configure");
   }
 
   WiFi.begin(ssid, password);
@@ -92,12 +96,15 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
     AwsFrameInfo *info = (AwsFrameInfo*)arg;
     if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
       data[len] = 0;
-      Serial.printf("%s\n", (char*)data);
+      Serial.printf("Received data: %s\n", (char*)data);
       if (strcmp((char*)data, "toggleON") == 0) {
+        digitalWrite(led, HIGH);
         Serial.println("Turn LED ON");
       } else if (strcmp((char*)data, "toggleOFF") == 0) {
+        digitalWrite(led, LOW);
         Serial.println("Turn LED OFF");
       }
     }
   }
 }
+
