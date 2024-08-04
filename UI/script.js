@@ -3,15 +3,17 @@ var websocket;
 
 window.addEventListener('load', onLoad);
 
-function initWebSocket() {
-    websocket = new WebSocket(gateway);
-    websocket.onopen = onOpen;
-    websocket.onclose = onClose;
-    websocket.onmessage = onMessage;
+function onLoad(event) {
+    initWebSocket();
+}
+
+function toggleButton(index) {
+    websocket.send("toggle" + index);
 }
 
 function onOpen(event) {
     console.log('Connection opened');
+    getReadings();
 }
 
 function onClose(event) {
@@ -19,36 +21,27 @@ function onClose(event) {
     setTimeout(initWebSocket, 2000);
 }
 
+function initWebSocket() {
+    console.log('Trying to open a WebSocket connection…');
+    websocket = new WebSocket(gateway);
+    websocket.onopen = onOpen;
+    websocket.onclose = onClose;
+    websocket.onmessage = onMessage;
+}
+
+
 function onMessage(event) {
     var data;
-    try {
-        data = JSON.parse(event.data);
-        if (data.temperature && data.humidity) {
-            document.getElementById('temperature').innerHTML = data.temperature.toFixed(2);
-            document.getElementById('humidity').innerHTML = data.humidity.toFixed(2);
-        } else if (data.relay && (data.state === "1" || data.state === "0")) {
-            var state = data.state === "1" ? "ON" : "OFF";
-            document.getElementById(`state${data.relay}`).innerHTML = state;
+    data = JSON.parse(event.data);
+    if (data.temperature && data.humidity) {
+        document.getElementById('temperature').innerHTML = data.temperature.toFixed(2);
+        document.getElementById('humidity').innerHTML = data.humidity.toFixed(2);
+    } else {
+        var msg = event.data;
+        if (msg.startsWith("state")) {
+            var index = msg.charAt(5);
+            var state = msg.substring(7);
+            document.getElementById("state" + index).innerText = state;
         }
-    } catch (e) {
-        console.error('Error parsing message data:', e);
     }
-}
-
-function onLoad(event) {
-    initWebSocket();
-    initButtons();
-}
-
-function initButtons() {
-    var buttons = document.querySelectorAll('.button');
-    buttons.forEach(function (button, index) {
-        button.addEventListener('click', function () {
-            toggle(index + 1);
-        });
-    });
-}
-
-function toggle(relay) {
-    websocket.send(JSON.stringify({ relay: relay, action: 'toggle' }));
 }

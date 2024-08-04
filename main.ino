@@ -1,4 +1,3 @@
-
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
@@ -12,16 +11,34 @@ int led = D7;
 AsyncWebServer server(httpPort);
 AsyncWebSocket ws("/ws");
 
-// Task to read temperature and humidity
+bool buttonStates[4] = {false, false, false, false};
+
+// Hàm để đọc nhiệt độ và độ ẩm
 void TaskTemperatureHumidity(void *pvParameters);
 void TaskSwitchRelay(void *pvParameters);
 
-void setup()
-{
-  Serial.begin(115200);
-  pinMode(led, OUTPUT);
+void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
+    if (type == WS_EVT_CONNECT) {
+        Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
+    } else if (type == WS_EVT_DISCONNECT) {
+         Serial.printf("WebSocket client #%u disconnected\n", client->id());
+    } else if (type == WS_EVT_DATA) {
+        String message = String((char *)data);
+        if (message.startsWith("toggle")) {
+            int buttonIndex = message.substring(6).toInt();
+            Serial.println(buttonIndex);
+            buttonStates[buttonIndex] = !buttonStates[buttonIndex];
+            String stateMsg = "state" + String(buttonIndex) + ":" + (buttonStates[buttonIndex] ? "ON" : "OFF");
+            ws.textAll(stateMsg);
+        }
+    }
+}
 
-  if (!LittleFS.begin())
+void setup() {
+    Serial.begin(115200);
+    pinMode(led, OUTPUT);
+
+    if (!LittleFS.begin())
   {
     Serial.println("An Error has occurred while mounting LittleFS");
     return;
@@ -42,7 +59,7 @@ void setup()
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
-  // Start DHT sensor
+   // Start DHT sensor
   dht20.begin();
 
   // Set up WebSocket events
@@ -50,9 +67,8 @@ void setup()
   server.addHandler(&ws);
 
   // Serve the HTML page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-            { request->send(LittleFS, "/index.html", "text/html"); });
-
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(LittleFS, "/index.html", "text/html"); });
   // Serve the JavaScript file
   server.on("/script.js", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send(LittleFS, "/script.js", "application/javascript"); });
@@ -70,75 +86,44 @@ void setup()
   Serial.println("Task started");
 }
 
-void loop()
-{
-  // The main loop can be used for other tasks if necessary
-}
-bool state = false;
-void TaskTemperatureHumidity(void *pvParameters)
-{
-  while (1)
-  {
-    // Read data from the DHT20 sensor
-    dht20.read();
-    float temperature = dht20.getTemperature();
-    float humidity = dht20.getHumidity();
-    if (ws.count() > 0)
-    {
-      String data = String("{\"temperature\":") + temperature + ",\"humidity\":" + humidity + "}";
-      ws.textAll(data);
-    }
-
-    // Wait for 5 seconds before reading again
-    delay(5000);
-  }
+void loop() {
+    // Vòng lặp chính có thể được sử dụng cho các nhiệm vụ khác nếu cần
 }
 
-void TaskSwitchRelay(void *pvParameters)
-{
+void TaskTemperatureHumidity(void *pvParameters) {
+    while (1) {
+        // Đọc dữ liệu từ cảm biến DHT20
+        dht20.read();
+        float temperature = dht20.getTemperature();
+        float humidity = dht20.getHumidity();
+        if (ws.count() > 0) {
+            String data = String("{\"temperature\":") + temperature + ",\"humidity\":" + humidity + ",\"states\":[";
+            for (int i = 0; i < 4; i++) {
+                data += (buttonStates[i] ? "\"ON\"" : "\"OFF\"");
+                if (i < 3) data += ",";
+            }
+            data += "]}";
+            ws.textAll(data);
+        }
 
-  pinMode(D3, OUTPUT);
-
-  while (1)
-  {
-    if (state)
-    {
-      digitalWrite(D3, HIGH);
+        // Đợi 5 giây trước khi đọc lại
+        delay(5000);
     }
-    else
-    {
-      digitalWrite(D3, LOW);
-    }
-  }
 }
 
-void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len)
-{
-  if (type == WS_EVT_CONNECT)
-  {
-    Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-  }
-  else if (type == WS_EVT_DISCONNECT)
-  {
-    Serial.printf("WebSocket client #%u disconnected\n", client->id());
-  }
-  else if (type == WS_EVT_DATA)
-  {
-    AwsFrameInfo *info = (AwsFrameInfo *)arg;
-    if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
-    {
-      data[len] = 0;
-      Serial.printf("Received data: %s\n", (char *)data);
-      if (strcmp((char *)data, "toggleON") == 0)
-      {
-        state = true;
-        Serial.println("Turn LED ON");
-      }
-      else if (strcmp((char *)data, "toggleOFF") == 0)
-      {
-        state = false;
-        Serial.println("Turn LED OFF");
-      }
+void TaskSwitchRelay(void *pvParameters) {
+    pinMode(D3, OUTPUT);
+
+    while (1) {
+        // Điều khiển trạng thái relay dựa trên mảng buttonStates
+        for (int i = 0; i < 4; i++) {
+            if (buttonStates[i]) {
+                digitalWrite(D3, HIGH);
+            } else {
+                digitalWrite(D3, LOW);
+            }
+        }
+        // Đợi để tránh làm quá tải vòng lặp
+        delay(100);
     }
-  }
 }
