@@ -7,6 +7,7 @@
 #include "config.h"
 
 DHT20 dht20;
+int sensorPin=D9;
 
 AsyncWebServer server(httpPort);
 AsyncWebSocket ws("/ws");
@@ -33,8 +34,8 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
         {
             int buttonIndex = message.substring(6).toInt();
             Serial.println(buttonIndex);
-            buttonStates[buttonIndex - 1] = !buttonStates[buttonIndex - 1];
-            String data = String("{\"relay_id\":") + String(buttonIndex) + ",\"state\":\"" + (buttonStates[buttonIndex - 1] ? "ON" : "OFF") + "\"}";
+            buttonStates[buttonIndex] = !buttonStates[buttonIndex];
+            String data = String("{\"relay_id\":") + String(buttonIndex+1) + ",\"state\":\"" + (buttonStates[buttonIndex] ? "ON" : "OFF") + "\"}";
             ws.textAll(data);
         }
         // if(message=="getstate")
@@ -78,6 +79,7 @@ void setup()
     Serial.println(WiFi.localIP());
 
     dht20.begin();
+    pinMode(sensorPin,INPUT);
 
     ws.onEvent(onEvent);
     server.addHandler(&ws);
@@ -110,10 +112,10 @@ void TaskTemperatureHumidity(void *pvParameters)
         float humidity = dht20.getHumidity();
         if (ws.count() > 0)
         {
-            String data = String("{\"temperature\":") + temperature + ",\"humidity\":" + humidity + "}";
-            ws.textAll(data);
+          String data = "{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) +  ",\"flame\":\"" + String(digitalRead(sensorPin) == HIGH ? "No fire detected" : "Fire detected") +  "\"}";
+          ws.textAll(data);
         }
-        delay(5000);
+        vTaskDelay(5000 / portTICK_PERIOD_MS); 
     }
 }
 

@@ -44,8 +44,9 @@ function onMessage(event) {
         document.getElementById("state3").innerHTML = data.getState3;
         document.getElementById("state4").innerHTML = data.getState4;
     }
-    if (data.temperature && data.humidity) {
+    if (data.temperature && data.humidity && data.flame) {
         document.getElementById('temperature').innerHTML = data.temperature.toFixed(2);
         document.getElementById('humidity').innerHTML = data.humidity.toFixed(2);
+        document.getElementById('flame').innerHTML = data.flame;
     }
 }
