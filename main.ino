@@ -8,6 +8,7 @@
 
 DHT20 dht20;
 int sensorPin=D9;
+int buzzerPin=D7;
 
 AsyncWebServer server(httpPort);
 AsyncWebSocket ws("/ws");
@@ -80,6 +81,7 @@ void setup()
 
     dht20.begin();
     pinMode(sensorPin,INPUT);
+    pinMode(buzzerPin, OUTPUT);
 
     ws.onEvent(onEvent);
     server.addHandler(&ws);
@@ -113,6 +115,7 @@ void TaskTemperatureHumidity(void *pvParameters)
         if (ws.count() > 0)
         {
           String data = "{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) +  ",\"flame\":\"" + String(digitalRead(sensorPin) == HIGH ? "No fire detected" : "Fire detected") +  "\"}";
+          digitalWrite(buzzerPin, digitalRead(sensorPin)==HIGH ? LOW : HIGH);
           ws.textAll(data);
         }
         vTaskDelay(5000 / portTICK_PERIOD_MS); 
