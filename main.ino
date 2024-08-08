@@ -102,7 +102,8 @@ void setup()
 
 void loop()
 {
-    ws.cleanupClients();
+  digitalWrite(buzzerPin, digitalRead(sensorPin)==HIGH ? LOW : HIGH);
+  ws.cleanupClients();
 }
 
 void TaskTemperatureHumidity(void *pvParameters)
@@ -115,10 +116,9 @@ void TaskTemperatureHumidity(void *pvParameters)
         if (ws.count() > 0)
         {
           String data = "{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) +  ",\"flame\":\"" + String(digitalRead(sensorPin) == HIGH ? "No fire detected" : "Fire detected") +  "\"}";
-          digitalWrite(buzzerPin, digitalRead(sensorPin)==HIGH ? LOW : HIGH);
           ws.textAll(data);
         }
-        vTaskDelay(5000 / portTICK_PERIOD_MS); 
+        vTaskDelay(2000 / portTICK_PERIOD_MS); 
     }
 }
 
