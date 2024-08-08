@@ -6,15 +6,21 @@
 #include <Adafruit_NeoPixel.h>
 #include <LiquidCrystal_I2C.h>
 
+#define FULL_ANGLE 300
+#define ADC_REF 3.3 
+#define GROVE_VCC 3.3 
 int sensorPin = D9;
 
 void TaskFS(void *pvParameters); // Flame sensor
+void TaskBM(void *pvParameters); // Buzzer module
 void TaskAS(void *pvParameters); // Audio sensor
 void TaskLCD(void *pvParameters);
 void TaskMFM(void *pvParameters);  // Mini fan motor
 void TaskSMS(void *pvParameters);  // Soil moisture
+void TaskASM(void *pvParameters);  // Angle sensor module
 void TaskPIR(void *pvParameters);  // Passive infrared sensor
 void TaskUSM(void *pvParameters);  // Ultrasonic sensor module
+void TaskIOS(void *pvParameters);  // Infrared obstacle sensor
 void Task2CSM(void *pvParameters); // 2-Channel switching module
 void TaskServo(void *pvParameters);
 void TaskRelay(void *pvParameters);
@@ -28,12 +34,15 @@ void setup()
   Wire.begin();
 
   xTaskCreate(TaskFS, "TaskFS", 2048, NULL, 2, NULL);
+  xTaskCreate(TaskBM, "TaskBM", 2048, NULL, 2, NULL);
   xTaskCreate(TaskAS, "TaskAS", 2048, NULL, 2, NULL);
   xTaskCreate(TaskLCD, "TaskLCD", 2048, NULL, 2, NULL);
   xTaskCreate(TaskMFM, "TaskMFM", 2048, NULL, 2, NULL);
   xTaskCreate(TaskSMS, "TaskSMS", 2048, NULL, 2, NULL);
+  xTaskCreate(TaskASM, "TaskASM", 2048, NULL, 2, NULL);
   xTaskCreate(TaskPIR, "TaskPir", 2048, NULL, 2, NULL);
   xTaskCreate(TaskUSM, "TaskUSM", 2048, NULL, 2, NULL);
+  xTaskCreate(TaskIOS, "TaskIOS", 2048, NULL, 2, NULL);
   xTaskCreate(Task2CSM, "Task2CSM", 2048, NULL, 2, NULL);
   xTaskCreate(TaskServo, "TaskServo", 2048, NULL, 2, NULL);
   xTaskCreate(TaskRelay, "TaskRelay", 2048, NULL, 2, NULL);
@@ -56,6 +65,20 @@ void TaskFS(void *pvParameters)
   while (1)
   {
     Serial.println("Flame sensor : " + String(digitalRead(sensorPin) == HIGH ? "No fire detected" : "Fire detected"));
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+  }
+}
+
+void TaskBM(void *pvParameters)
+{
+  pinMode(sensorPin, OUTPUT);
+  bool check = true;
+
+  while (1)
+  {
+    digitalWrite(sensorPin, check ? HIGH : LOW);
+    Serial.println("Buzzer module : " + String(check ? "ON" : "OFF"));
+    check = !check;
     vTaskDelay(5000 / portTICK_PERIOD_MS);
   }
 }
@@ -110,13 +133,33 @@ void TaskSMS(void *pvParameters)
   }
 }
 
+void TaskASM(void *pvParameters)
+{
+  #define FULL_ANGLE 300
+  pinMode(sensorPin, INPUT);
+  int led=1;
+
+  while (1)
+  {
+    float voltage;
+    int sensor_value = analogRead(sensorPin); // Read the value from the sensor
+    voltage = (float)sensor_value * ADC_REF / 4095; // Convert the analog value to voltage
+    float degrees = (voltage * FULL_ANGLE) / GROVE_VCC; // Calculate the rotation angle based on the read voltage value
+    int brightness = map(degrees, 0, FULL_ANGLE, 0, 1023); // Convert the rotation angle value to LED brightness value
+    float brightnessPercentage = (brightness / 1023.0) * 100; // Convert brightness to percentage
+    Serial.println("LED brightness: " + String(brightnessPercentage) + "%"); 
+    analogWrite(led, brightness); // Control the LED brightness via PWM connection
+    vTaskDelay(5000 / portTICK_PERIOD_MS); // Delay for 5 seconds
+  }
+}
+
 void TaskPIR(void *pvParameters)
 {
   pinMode(sensorPin, INPUT);
 
   while (1)
   {
-    Serial.println("PIR : " + String(analogRead(sensorPin) ? "detect" : "not detect"));
+    Serial.println("Infrared obstacle sensor : " + String(digitalRead(sensorPin) == LOW ? "No object detected" : "Object detected"));
     vTaskDelay(5000 / portTICK_PERIOD_MS);
   }
 }
@@ -130,6 +173,17 @@ void TaskUSM(void *pvParameters)
   while (1)
   {
     Serial.println("Distance : " + String(ultrasonic.read()) + " cm");
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+  }
+}
+
+void TaskIOS(void *pvParameters)
+{ 
+  pinMode(sensorPin, INPUT);
+
+  while (1)
+  {
+  
     vTaskDelay(5000 / portTICK_PERIOD_MS);
   }
 }
